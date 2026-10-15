@@ -128,6 +128,49 @@ const shutdownBtn = document.getElementById('shutdownBtn');
 const shareBackupBtn = document.getElementById('shareBackupBtn');
 const settingsIntro = document.getElementById('settingsIntro');
 const LAST_BACKUP_STORAGE_KEY = 'l-uva-last-local-backup';
+const RESET_PIN = '0000';
+const pinModal = document.getElementById('pinModal');
+const pinMessageEl = document.getElementById('pinMessage');
+const pinInput = document.getElementById('pinInput');
+const pinErrorEl = document.getElementById('pinError');
+const pinOkBtn = document.getElementById('pinOkBtn');
+const pinCancelBtn = document.getElementById('pinCancelBtn');
+
+// PIN penceresini açar; doğru PIN girilirse true, vazgeçilirse false döner.
+function askPin(message) {
+  return new Promise((resolve) => {
+    pinMessageEl.textContent = message;
+    pinInput.value = '';
+    pinErrorEl.hidden = true;
+    pinModal.hidden = false;
+    pinInput.focus();
+
+    const close = (result) => {
+      pinModal.hidden = true;
+      pinInput.value = '';
+      pinOkBtn.onclick = null;
+      pinCancelBtn.onclick = null;
+      pinInput.onkeydown = null;
+      resolve(result);
+    };
+    const submit = () => {
+      if (pinInput.value === RESET_PIN) {
+        close(true);
+        return;
+      }
+      pinErrorEl.hidden = false;
+      pinInput.value = '';
+      pinInput.focus();
+    };
+
+    pinOkBtn.onclick = submit;
+    pinCancelBtn.onclick = () => close(false);
+    pinInput.onkeydown = (event) => {
+      if (event.key === 'Enter') submit();
+      if (event.key === 'Escape') close(false);
+    };
+  });
+}
 
 // true: PC'deki yerel sunucu (PowerShell) ile çalışıyor; false: tablet/PWA (sunucusuz).
 let serverMode = false;
@@ -1659,9 +1702,8 @@ async function deleteRecord(id) {
 async function resetData() {
   if (!window.confirm('Tüm otel gelir gider verilerini silmek istediğinize emin misiniz?')) return;
 
-  const typed = window.prompt('Bu işlem GERİ ALINAMAZ. Onaylamak için SİL yazın:');
-  if (typed === null || typed.trim().toLocaleUpperCase('tr-TR') !== 'SİL') {
-    window.alert('Onay metni doğru girilmedi; veriler silinmedi.');
+  if (!(await askPin('Tüm kayıtlar silinecek. Bu işlem geri alınamaz. Devam etmek için 4 haneli PIN girin.'))) {
+    window.alert('PIN girilmedi; veriler silinmedi.');
     return;
   }
   if (!(await createSafetyBackup('Silme işlemine'))) return;

@@ -1141,3 +1141,28 @@ tr:hover td {
     flex: 1 1 150px;
   }
 }
+
+.danger-btn {
+  color: #fca5a5;
+  border-color: rgba(248, 113, 113, 0.4);
+}
+
+.pin-overlay {
+  z-index: 40;
+}
+
+.pin-dialog {
+  width: min(380px, 100%);
+}
+
+#pinInput {
+  text-align: center;
+  font-size: 1.8rem;
+  letter-spacing: 0.6em;
+}
+
+.pin-error {
+  margin: 10px 0 0;
+  color: var(--expense);
+  font-size: 0.9rem;
+}

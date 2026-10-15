@@ -82,10 +82,6 @@
             <h2>L'UVA CAVE Gelir-Gider Takip</h2>
           </div>
           <div class="top-actions">
-            <button class="secondary-btn" id="resetBtn" type="button">Verileri Sıfırla</button>
-            <button class="secondary-btn" id="dbExportBtn" type="button">Yedek İndir</button>
-            <button class="secondary-btn" id="dbImportBtn" type="button">Yedek Yükle</button>
-            <input id="dbImportInput" type="file" accept=".sqlite,.sqlite3,.db,application/vnd.sqlite3" hidden />
             <button class="secondary-btn" id="csvExportBtn" type="button">CSV</button>
             <button class="secondary-btn" id="excelExportBtn" type="button">Excel</button>
             <button class="primary-btn" id="pdfExportBtn" type="button">PDF İndir</button>
@@ -440,6 +436,20 @@
 
         <section class="panel deferred-panel" id="settingsSection" hidden>
           <div class="section-heading">
+            <h3>Veri İşlemleri</h3>
+          </div>
+          <p class="due-warning-intro">
+            Yedek İndir veritabanını dosya olarak kaydeder. Yedek Yükle mevcut verilerin yerine seçilen yedeği koyar.
+            Verileri Sıfırla tüm kayıtları siler ve 4 haneli PIN ister.
+          </p>
+          <div class="reminder-controls import-controls">
+            <button class="secondary-btn" id="dbExportBtn" type="button">Yedek İndir</button>
+            <button class="secondary-btn" id="dbImportBtn" type="button">Yedek Yükle</button>
+            <input id="dbImportInput" type="file" accept=".sqlite,.sqlite3,.db,application/vnd.sqlite3" hidden />
+            <button class="secondary-btn danger-btn" id="resetBtn" type="button">Verileri Sıfırla</button>
+          </div>
+
+          <div class="section-heading deferred-list-heading">
             <h3>Otomatik Yedekleme ve Mail Ayarları</h3>
           </div>
           <p class="due-warning-intro" id="settingsIntro">
@@ -530,6 +540,21 @@
     </div>
 
     <datalist id="companySuggestions"></datalist>
+
+    <div class="modal-overlay pin-overlay" id="pinModal" hidden>
+      <section class="due-warning-dialog pin-dialog" role="dialog" aria-modal="true" aria-labelledby="pinTitle">
+        <div class="section-heading">
+          <h3 id="pinTitle">PIN gerekli</h3>
+        </div>
+        <p class="due-warning-intro" id="pinMessage"></p>
+        <input id="pinInput" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" placeholder="••••" aria-label="4 haneli PIN" />
+        <p class="pin-error" id="pinError" hidden>PIN yanlış. Tekrar deneyin.</p>
+        <div class="reminder-controls">
+          <button class="secondary-btn" id="pinCancelBtn" type="button">Vazgeç</button>
+          <button class="primary-btn" id="pinOkBtn" type="button">Onayla</button>
+        </div>
+      </section>
+    </div>
 
     <div class="modal-overlay" id="dueWarningModal" hidden>
       <section class="due-warning-dialog" role="dialog" aria-modal="true" aria-labelledby="dueWarningTitle">
