@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0b1220" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" type="image/png" href="icon-192.png" />
+    <link rel="apple-touch-icon" href="icon-192.png" />
+    <title>L'UVA CAVE Gelir-Gider Takip</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="./vendor/sql-wasm.js"></script>
+    <script src="./vendor/jspdf.umd.min.js"></script>
+    <script src="./vendor/jspdf.plugin.autotable.min.js"></script>
+    <script src="./vendor/exceljs.min.js"></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand-box">
+          <div class="brand-mark">🏨</div>
+          <div>
+            <p class="eyebrow">L'UVA CAVE</p>
+            <h1>L'UVA CAVE</h1>
+          </div>
+        </div>
+
+        <nav class="nav">
+          <button class="nav-item active" data-view="overview" type="button">
+            <span>📊</span>
+            Genel Bakış
+          </button>
+          <button class="nav-item" data-view="income" type="button">
+            <span>💰</span>
+            Gelirler
+          </button>
+          <button class="nav-item" data-view="expense" type="button">
+            <span>📉</span>
+            Giderler
+          </button>
+          <button class="nav-item" data-view="extra" type="button">
+            <span>👤</span>
+            Ekstra Giderler
+          </button>
+          <button class="nav-item" data-view="deferred" type="button">
+            <span>🗓</span>
+            Vadeli Ödemeler
+          </button>
+          <button class="nav-item" data-view="tax" type="button">
+            <span>🧾</span>
+            Vergi Ödemeleri
+          </button>
+          <button class="nav-item" data-view="monthly" type="button">
+            <span>📆</span>
+            Aylık Özet
+          </button>
+          <button class="nav-item" data-view="reports" type="button">
+            <span>📁</span>
+            Raporlar
+          </button>
+          <button class="nav-item" data-view="import" type="button">
+            <span>📥</span>
+            Excel ile Giriş
+          </button>
+          <button class="nav-item" data-view="settings" type="button">
+            <span>⚙️</span>
+            Ayarlar
+          </button>
+        </nav>
+
+        <div class="sidebar-card">
+          <p class="panel-label">Bu ay</p>
+          <h3 id="monthSnapshot">₺0</h3>
+          <small id="monthLabel">Ekim 2026</small>
+        </div>
+      </aside>
+
+      <main class="main-panel">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">PANEL</p>
+            <h2>L'UVA CAVE Gelir-Gider Takip</h2>
+          </div>
+          <div class="top-actions">
+            <button class="secondary-btn" id="resetBtn" type="button">Verileri Sıfırla</button>
+            <button class="secondary-btn" id="dbExportBtn" type="button">Yedek İndir</button>
+            <button class="secondary-btn" id="dbImportBtn" type="button">Yedek Yükle</button>
+            <input id="dbImportInput" type="file" accept=".sqlite,.sqlite3,.db,application/vnd.sqlite3" hidden />
+            <button class="secondary-btn" id="csvExportBtn" type="button">CSV</button>
+            <button class="secondary-btn" id="excelExportBtn" type="button">Excel</button>
+            <button class="primary-btn" id="pdfExportBtn" type="button">PDF İndir</button>
+          </div>
+        </header>
+
+        <section class="stats-grid" id="statsSection">
+          <article class="stat-card income">
+            <div class="stat-header">
+              <span>Toplam Gelir</span>
+              <span class="emoji">↗</span>
+            </div>
+            <h3 id="totalIncome">₺0</h3>
+            <small id="incomeCount">0 kayıt</small>
+          </article>
+
+          <article class="stat-card expense">
+            <div class="stat-header">
+              <span>Toplam Gider</span>
+              <span class="emoji">↘</span>
+            </div>
+            <h3 id="totalExpense">₺0</h3>
+            <small id="expenseCount">0 kayıt</small>
+          </article>
+
+          <article class="stat-card balance">
+            <div class="stat-header">
+              <span>Net Bakiye</span>
+              <span class="emoji">◎</span>
+            </div>
+            <h3 id="netBalance">₺0</h3>
+            <small id="netLabel">Toplam fark</small>
+          </article>
+
+          <article class="stat-card count">
+            <div class="stat-header">
+              <span>İşlem Sayısı</span>
+              <span class="emoji">#</span>
+            </div>
+            <h3 id="transactionCount">0</h3>
+            <small id="lastEntry">Son işlem yok</small>
+          </article>
+        </section>
+
+        <section class="content-grid" id="overviewSection">
+          <div class="panel form-panel">
+            <div class="section-heading">
+              <h3>Yeni İşlem</h3>
+            </div>
+
+            <form id="recordForm">
+              <div class="field-group two-cols">
+                <label>
+                  <span>Tarih</span>
+                  <input type="date" id="dateInput" required />
+                </label>
+                <label>
+                  <span>Tür</span>
+                  <select id="typeInput" required>
+                    <option value="gelir">Gelir</option>
+                    <option value="gider">Gider</option>
+                  </select>
+                </label>
+              </div>
+
+              <div class="field-group two-cols">
+                <label>
+                  <div class="category-field-heading">
+                    <span>Kategori</span>
+                    <div class="category-actions">
+                      <button class="category-action add-category-btn" id="addCategoryBtn" type="button" title="Yeni kategori ekle" aria-label="Yeni kategori ekle">+</button>
+                      <button class="category-action remove-category-btn" id="removeCategoryBtn" type="button" title="Seçili kategoriyi kaldır" aria-label="Seçili kategoriyi kaldır">−</button>
+                    </div>
+                  </div>
+                  <select id="categoryInput" required></select>
+                </label>
+                <label>
+                  <span>Tutar</span>
+                  <input type="number" id="amountInput" min="0.01" step="0.01" placeholder="0.00" required />
+                </label>
+              </div>
+
+              <label>
+                <span>İsim / Firma</span>
+                <input type="text" id="nameCompanyInput" list="companySuggestions" maxlength="100" placeholder="Örn. Tedarikçi veya kişi adı" />
+              </label>
+
+              <label>
+                <span>Açıklama</span>
+                <input type="text" id="descriptionInput" maxlength="100" placeholder="Örn. Oda geliri, kahvaltı, personel, temizlik..." />
+              </label>
+
+              <button class="primary-btn full-width" type="submit">İşlemi Kaydet</button>
+            </form>
+          </div>
+
+          <div class="panel chart-panel">
+            <div class="section-heading">
+              <h3>Son 6 Ay</h3>
+            </div>
+            <div id="monthlyChart" class="monthly-chart" aria-label="Aylık gelir gider grafiği"></div>
+          </div>
+        </section>
+
+        <section class="panel dashboard-due-panel" id="dueSummarySection">
+          <div class="section-heading table-heading">
+            <h3>Vadeli Ödemeler</h3>
+            <button class="secondary-btn" id="openDeferredFromDashboard" type="button">Ödeme Takibine Git</button>
+          </div>
+          <div class="due-summary-metrics">
+            <div>
+              <span>Bekleyen toplam</span>
+              <strong id="dashboardDueAmount">₺0</strong>
+            </div>
+            <div>
+              <span>Bekleyen ödeme</span>
+              <strong id="dashboardDueCount">0</strong>
+            </div>
+            <div>
+              <span>3 gün içinde vadesi gelen</span>
+              <strong id="dashboardDueSoonCount">0</strong>
+            </div>
+          </div>
+          <div id="dashboardDueList" class="dashboard-due-list"></div>
+        </section>
+
+        <section class="panel personal-expenses-panel" id="extraSection" hidden>
+          <div class="section-heading">
+            <h3>Ekstra Kişisel Giderler</h3>
+          </div>
+
+          <div class="person-manager">
+            <div class="person-add-row">
+              <input id="extraNameInput" type="text" placeholder="Yeni isim ekle" maxlength="50" />
+              <button class="primary-btn" id="addPersonBtn" type="button">Kişi Ekle</button>
+            </div>
+            <div id="extraPeopleList" class="people-list"></div>
+          </div>
+
+          <form id="extraExpenseForm" class="extra-form">
+            <div class="field-group two-cols">
+              <label>
+                <span>Kişi</span>
+                <select id="extraPersonSelect" required></select>
+              </label>
+              <label>
+                <span>Ödeme</span>
+                <select id="extraPaymentMethodInput" required>
+                  <option value="Nakit">Nakit</option>
+                  <option value="Havale">Havale</option>
+                  <option value="Kart">Kart</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="field-group two-cols">
+              <label>
+                <span>Tutar</span>
+                <input id="extraAmountInput" type="number" min="0.01" step="0.01" placeholder="0.00" required />
+              </label>
+              <label>
+                <span>Tarih</span>
+                <input id="extraDateInput" type="date" required />
+              </label>
+            </div>
+
+            <div class="sign-row">
+              <span>İşlem</span>
+              <div class="sign-toggle">
+                <button class="sign-btn positive active" data-sign="+" type="button">+</button>
+                <button class="sign-btn negative" data-sign="-" type="button">-</button>
+              </div>
+            </div>
+
+            <label>
+              <span>Açıklama</span>
+              <input id="extraDescriptionInput" type="text" placeholder="Örn. Kıyafet, market, harçlık..." maxlength="100" />
+            </label>
+
+            <button class="primary-btn full-width" type="submit">Kayıt Ekle</button>
+          </form>
+
+          <div class="section-heading extra-list-heading">
+            <h3>Özel Kayıtlar</h3>
+          </div>
+          <div id="extraExpenseList" class="extra-expense-list"></div>
+        </section>
+
+        <section class="panel deferred-panel" id="deferredSection" hidden>
+          <div class="section-heading">
+            <h3>Vadeli Ödeme Ekle</h3>
+          </div>
+          <form id="deferredPaymentForm" class="deferred-form">
+            <div class="field-group two-cols">
+              <label>
+                <span>İsim / Firma</span>
+                <input id="deferredNameInput" type="text" list="companySuggestions" maxlength="100" placeholder="Ödeme yapılacak kişi veya firma" required />
+              </label>
+              <label>
+                <span>Tutar</span>
+                <input id="deferredAmountInput" type="number" min="0.01" step="0.01" placeholder="0.00" required />
+              </label>
+            </div>
+            <div class="field-group two-cols">
+              <label>
+                <span>Vade tarihi</span>
+                <input id="deferredDateInput" type="date" required />
+              </label>
+              <label>
+                <span>Ödeme yöntemi</span>
+                <select id="deferredPaymentMethodInput" required>
+                  <option value="Havale">Havale</option>
+                  <option value="Nakit">Nakit</option>
+                  <option value="Kart">Kart</option>
+                  <option value="Çek">Çek</option>
+                </select>
+              </label>
+            </div>
+            <label>
+              <span>Açıklama</span>
+              <input id="deferredDescriptionInput" type="text" maxlength="150" placeholder="Ödeme açıklaması" />
+            </label>
+            <button class="primary-btn full-width" type="submit">Vadeli Ödeme Kaydet</button>
+          </form>
+
+          <div class="section-heading deferred-list-heading">
+            <h3>Ödeme Takibi</h3>
+          </div>
+          <div class="table-wrap">
+            <table class="deferred-table">
+              <thead>
+                <tr>
+                  <th>İsim / Firma</th>
+                  <th>Vade</th>
+                  <th>Açıklama</th>
+                  <th>Yöntem</th>
+                  <th class="amount-col">Tutar</th>
+                  <th>Durum</th>
+                  <th>İşlem</th>
+                </tr>
+              </thead>
+              <tbody id="deferredTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel deferred-panel" id="taxSection" hidden>
+          <div class="section-heading">
+            <h3>Vergi Ödemesi Ekle</h3>
+          </div>
+          <form id="taxPaymentForm" class="deferred-form">
+            <div class="field-group two-cols">
+              <label>
+                <span>Vergi türü</span>
+                <select id="taxTypeInput" required>
+                  <option value="KDV">KDV</option>
+                  <option value="Muhtasar">Muhtasar</option>
+                  <option value="SGK">SGK</option>
+                  <option value="Gelir Vergisi">Gelir Vergisi</option>
+                  <option value="Kurumlar Vergisi">Kurumlar Vergisi</option>
+                  <option value="Konaklama Vergisi">Konaklama Vergisi</option>
+                  <option value="Damga Vergisi">Damga Vergisi</option>
+                  <option value="Diğer">Diğer</option>
+                </select>
+              </label>
+              <label>
+                <span>Dönem</span>
+                <input id="taxPeriodInput" type="text" maxlength="40" placeholder="Örn. Ekim 2026" />
+              </label>
+            </div>
+            <div class="field-group two-cols">
+              <label>
+                <span>Tutar</span>
+                <input id="taxAmountInput" type="number" min="0.01" step="0.01" placeholder="0.00" required />
+              </label>
+              <label>
+                <span>Son ödeme günü</span>
+                <input id="taxDueDateInput" type="date" required />
+              </label>
+            </div>
+            <label>
+              <span>Açıklama</span>
+              <input id="taxDescriptionInput" type="text" maxlength="150" placeholder="Vergi ödemesi notu" />
+            </label>
+            <button class="primary-btn full-width" type="submit">Vergi Ödemesi Kaydet</button>
+          </form>
+
+          <div class="section-heading deferred-list-heading">
+            <h3>Vergi Takvimi</h3>
+          </div>
+          <div class="table-wrap">
+            <table class="deferred-table">
+              <thead>
+                <tr>
+                  <th>Vergi</th>
+                  <th>Dönem</th>
+                  <th>Açıklama</th>
+                  <th>Son ödeme günü</th>
+                  <th class="amount-col">Tutar</th>
+                  <th>Durum</th>
+                  <th>İşlem</th>
+                </tr>
+              </thead>
+              <tbody id="taxTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel deferred-panel" id="importSection" hidden>
+          <div class="section-heading">
+            <h3>Excel ile Toplu Giriş</h3>
+          </div>
+          <p class="due-warning-intro">
+            1) Şablonu indirin, 2) Excel'de doldurun (gelir-gider, vadeli ödeme, vergi ve kişisel kayıtlar için ayrı sayfalar vardır),
+            3) Doldurulmuş dosyayı yükleyin, 4) Önizlemeyi kontrol edip onaylayın. Yüklemeden önce otomatik güvenlik yedeği alınır.
+          </p>
+          <div class="reminder-controls import-controls">
+            <button class="primary-btn" id="templateDownloadBtn" type="button">Örnek Excel Şablonunu İndir</button>
+            <button class="secondary-btn" id="importPickBtn" type="button">Doldurulmuş Excel'i Yükle</button>
+            <input id="importFileInput" type="file" accept=".xlsx" hidden />
+          </div>
+          <div id="importPreview" class="import-preview" aria-live="polite"></div>
+
+          <div class="section-heading deferred-list-heading">
+            <h3>Mevcut Kayıtları Excel Olarak Al</h3>
+          </div>
+          <p class="due-warning-intro">
+            Kayıtlarınızı yukarıdaki şablonla aynı biçimde indirir; muhasebeciye vermek veya toplu düzenleyip geri yüklemek için kullanılabilir.
+            Gelir-Gider ve Kişisel sayfalarına tarih aralığı uygulanır; Vadeli ve Vergi sayfalarına yalnızca ödenmemiş kayıtlar yazılır.
+          </p>
+          <div class="reminder-controls import-controls">
+            <input id="exportFromInput" type="date" aria-label="Başlangıç tarihi" title="Başlangıç tarihi (boşsa tümü)" />
+            <input id="exportToInput" type="date" aria-label="Bitiş tarihi" title="Bitiş tarihi (boşsa tümü)" />
+            <button class="secondary-btn" id="exportTemplateBtn" type="button">Şablon Biçiminde İndir (.xlsx)</button>
+          </div>
+        </section>
+
+        <section class="panel deferred-panel" id="monthlySection" hidden>
+          <div class="section-heading table-heading">
+            <h3>Aylık Özet</h3>
+            <div class="table-filters">
+              <input id="monthlyMonthInput" type="month" aria-label="Ay" title="Ay" />
+              <select id="monthlyScopeInput" aria-label="Kayıt kaynağı" title="Kayıt kaynağı">
+                <option value="all">Şirket + Kişisel</option>
+                <option value="company">Sadece Şirket</option>
+              </select>
+              <button class="primary-btn" id="monthlyPdfBtn" type="button">Özeti PDF İndir</button>
+            </div>
+          </div>
+          <div id="monthlyContent"></div>
+        </section>
+
+        <section class="panel deferred-panel" id="settingsSection" hidden>
+          <div class="section-heading">
+            <h3>Otomatik Yedekleme ve Mail Ayarları</h3>
+          </div>
+          <p class="due-warning-intro" id="settingsIntro">
+            Program, açık olduğu sürece her 3 günde bir veritabanını otomatik yedekler:
+            yedek dosyası <strong>Yedekler</strong> klasörüne kaydedilir ve aşağıdaki adres girilmişse mail ile gönderilir.
+          </p>
+          <form id="settingsForm" class="deferred-form" autocomplete="off">
+            <label>
+              <span>Yedeğin gönderileceği mail adresi</span>
+              <input id="settingsEmailInput" type="email" maxlength="120" placeholder="ornek@firma.com" />
+            </label>
+            <div class="field-group two-cols">
+              <label>
+                <span>SMTP sunucusu</span>
+                <input id="smtpHostInput" type="text" maxlength="120" placeholder="Gmail için: smtp.gmail.com" />
+              </label>
+              <label>
+                <span>Port</span>
+                <input id="smtpPortInput" type="number" min="1" max="65535" value="587" />
+              </label>
+            </div>
+            <div class="field-group two-cols">
+              <label>
+                <span>Gönderen hesap (kullanıcı adı)</span>
+                <input id="smtpUserInput" type="text" maxlength="120" placeholder="hesap@gmail.com" />
+              </label>
+              <label>
+                <span>Şifre (Gmail'de "uygulama şifresi")</span>
+                <input id="smtpPassInput" type="password" maxlength="200" placeholder="Değiştirmek için yazın" autocomplete="new-password" />
+              </label>
+            </div>
+            <label class="inline-check">
+              <input id="smtpSslInput" type="checkbox" checked />
+              <span>SSL/TLS kullan (587 ve 465 portları için önerilir)</span>
+            </label>
+            <button class="primary-btn full-width" type="submit">Ayarları Kaydet</button>
+          </form>
+
+          <div class="reminder-controls">
+            <button class="secondary-btn" id="backupNowBtn" type="button">Şimdi Yedekle ve Mail Gönder</button>
+            <button class="secondary-btn" id="shareBackupBtn" type="button" hidden>Yedeği Paylaş (Drive'a gönder)</button>
+            <button class="secondary-btn" id="shutdownBtn" type="button">Uygulamayı Kapat</button>
+          </div>
+          <p class="due-warning-intro" id="settingsStatus" aria-live="polite"></p>
+        </section>
+
+        <section class="panel table-panel">
+          <div class="section-heading table-heading">
+            <h3>İşlem Listesi</h3>
+            <div class="table-filters">
+              <select id="filterType">
+                <option value="all">Tümü</option>
+                <option value="gelir">Gelir</option>
+                <option value="gider">Gider</option>
+              </select>
+              <select id="filterScope" aria-label="Kayıt kaynağı" title="Kayıt kaynağı">
+                <option value="all">Şirket + Kişisel</option>
+                <option value="company">Sadece Şirket</option>
+                <option value="personal">Sadece Kişisel</option>
+              </select>
+              <select id="filterCategory">
+                <option value="all">Kategori</option>
+              </select>
+              <input id="filterStartDate" type="date" aria-label="Başlangıç tarihi" title="Başlangıç tarihi" />
+              <input id="filterEndDate" type="date" aria-label="Bitiş tarihi" title="Bitiş tarihi" />
+              <input id="searchInput" type="search" placeholder="İsim, firma, açıklama veya kategori ara..." />
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Tarih</th>
+                  <th>Tür</th>
+                  <th>Kategori</th>
+                  <th>İsim / Firma</th>
+                  <th>Açıklama</th>
+                  <th class="amount-col">Tutar</th>
+                  <th>İşlem</th>
+                </tr>
+              </thead>
+              <tbody id="recordTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <datalist id="companySuggestions"></datalist>
+
+    <div class="modal-overlay" id="dueWarningModal" hidden>
+      <section class="due-warning-dialog" role="dialog" aria-modal="true" aria-labelledby="dueWarningTitle">
+        <div class="section-heading">
+          <h3 id="dueWarningTitle">Vadesi yaklaşan ödemeler</h3>
+        </div>
+        <p class="due-warning-intro">Vadesi 3 gün içinde olan veya tarihi geçen bekleyen ödemeler:</p>
+        <div id="dueWarningList" class="due-warning-list"></div>
+        <button class="primary-btn full-width" id="closeDueWarningBtn" type="button">Tamam</button>
+      </section>
+    </div>
+
+    <div class="modal-overlay tax-warning-overlay" id="taxWarningModal" hidden>
+      <section class="due-warning-dialog tax-warning-dialog" role="dialog" aria-modal="true" aria-labelledby="taxWarningTitle">
+        <div class="section-heading">
+          <h3 id="taxWarningTitle">Vergi ödeme tarihi yaklaşıyor</h3>
+        </div>
+        <p class="due-warning-intro">Son ödeme gününe 3 gün veya daha az kalan vergiler:</p>
+        <div id="taxWarningList" class="due-warning-list"></div>
+        <div class="reminder-controls">
+          <button class="secondary-btn" id="taxSoundToggleBtn" type="button" aria-pressed="false">Sesli Uyarıyı Etkinleştir</button>
+          <button class="primary-btn" id="closeTaxWarningBtn" type="button">Kapat</button>
+        </div>
+      </section>
+    </div>
+
+    <script src="script.js"></script>
+    <script src="excel-import.js"></script>
+    <script src="excel-export.js"></script>
+  </body>
+</html>
