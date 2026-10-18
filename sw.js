@@ -1,5 +1,5 @@
 // Çevrimdışı çalışma: uygulama dosyaları önbelleğe alınır; internet varsa her zaman güncel sürüm alınır.
-const CACHE_NAME = 'luva-cave-20261015-153217';
+const CACHE_NAME = 'luva-cave-20261018-170124';
 const ASSETS = [
   './',
   'index.html',
@@ -7,6 +7,7 @@ const ASSETS = [
   'script.js',
   'excel-import.js',
   'excel-export.js',
+  'records-tools.js',
   'manifest.webmanifest',
   'icon-192.png',
   'icon-512.png',

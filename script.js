@@ -129,6 +129,9 @@ const shareBackupBtn = document.getElementById('shareBackupBtn');
 const settingsIntro = document.getElementById('settingsIntro');
 const LAST_BACKUP_STORAGE_KEY = 'l-uva-last-local-backup';
 const RESET_PIN = '0000';
+const RESTORE_PIN = '1234';
+const attachmentInput = document.getElementById('attachmentInput');
+const accountsSection = document.getElementById('accountsSection');
 const pinModal = document.getElementById('pinModal');
 const pinMessageEl = document.getElementById('pinMessage');
 const pinInput = document.getElementById('pinInput');
@@ -137,7 +140,7 @@ const pinOkBtn = document.getElementById('pinOkBtn');
 const pinCancelBtn = document.getElementById('pinCancelBtn');
 
 // PIN penceresini açar; doğru PIN girilirse true, vazgeçilirse false döner.
-function askPin(message) {
+function askPin(message, expectedPin = RESET_PIN) {
   return new Promise((resolve) => {
     pinMessageEl.textContent = message;
     pinInput.value = '';
@@ -154,7 +157,7 @@ function askPin(message) {
       resolve(result);
     };
     const submit = () => {
-      if (pinInput.value === RESET_PIN) {
+      if (pinInput.value === expectedPin) {
         close(true);
         return;
       }
@@ -416,7 +419,7 @@ function renderTaxPayments() {
         <td><span class="status-badge ${payment.status === 'paid' ? '' : 'pending'}">${statusLabel}</span></td>
         <td class="due-actions">
           ${payment.status === 'pending'
-    ? `<button class="paid-btn" data-tax-paid-id="${escapeHtml(payment.id)}" type="button">Ödendi</button>`
+    ? `<button class="paid-btn" data-tax-paid-id="${escapeHtml(payment.id)}" type="button">Ödendi</button><button class="delete-due-btn" data-edit-tax-id="${escapeHtml(payment.id)}" type="button">Düzenle</button>`
     : `<button class="delete-due-btn" data-tax-undo-id="${escapeHtml(payment.id)}" type="button">Geri Al</button>`}
           <button class="delete-due-btn" data-tax-id="${payment.id}" type="button">Sil</button>
         </td>
@@ -674,7 +677,7 @@ function renderDuePayments() {
         <td><span class="status-badge ${payment.status === 'paid' ? '' : 'pending'}">${statusLabel}</span></td>
         <td class="due-actions">
           ${payment.status === 'pending'
-    ? `<button class="paid-btn" data-paid-id="${escapeHtml(payment.id)}" type="button">Ödendi</button>`
+    ? `<button class="paid-btn" data-paid-id="${escapeHtml(payment.id)}" type="button">Ödendi</button><button class="delete-due-btn" data-edit-due-id="${escapeHtml(payment.id)}" type="button">Düzenle</button>`
     : `<button class="delete-due-btn" data-undo-id="${escapeHtml(payment.id)}" type="button">Geri Al</button>`}
           <button class="delete-due-btn" data-due-id="${escapeHtml(payment.id)}" type="button">Sil</button>
         </td>
@@ -942,9 +945,11 @@ function showView(view) {
   settingsSection.hidden = view !== 'settings';
   importSection.hidden = view !== 'import';
   monthlySection.hidden = view !== 'monthly';
-  tableSection.hidden = ['deferred', 'tax', 'settings', 'import', 'monthly'].includes(view);
-  statsSection.hidden = ['extra', 'deferred', 'tax', 'settings', 'import', 'monthly'].includes(view);
+  accountsSection.hidden = view !== 'accounts';
+  tableSection.hidden = ['deferred', 'tax', 'settings', 'import', 'monthly', 'accounts'].includes(view);
+  statsSection.hidden = ['extra', 'deferred', 'tax', 'settings', 'import', 'monthly', 'accounts'].includes(view);
   if (view === 'monthly') renderMonthlySummary();
+  if (view === 'accounts' && typeof renderAccounts === 'function') renderAccounts();
   if (view === 'settings') loadSettingsView();
 
   filterType.value = view === 'income' ? 'gelir' : view === 'expense' ? 'gider' : 'all';
@@ -1197,6 +1202,16 @@ function ensureSchema(db) {
       transaction_id TEXT
     );
 
+    CREATE TABLE IF NOT EXISTS attachments (
+      id TEXT PRIMARY KEY,
+      transaction_id TEXT NOT NULL,
+      name TEXT,
+      mime TEXT,
+      size INTEGER,
+      data BLOB NOT NULL,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+
     CREATE TABLE IF NOT EXISTS tax_payments (
       id TEXT PRIMARY KEY,
       tax_type TEXT NOT NULL,
@@ -1245,16 +1260,24 @@ function renderCategoryOptions() {
   const selectedType = typeInput.value;
   categoryInput.innerHTML = '';
 
-  getTypeOptions(selectedType).forEach((category) => {
-    const option = document.createElement('option');
-    option.value = category;
-    option.textContent = category;
-    categoryInput.appendChild(option);
-  });
+  if (selectedType === 'gelir' || selectedType === 'gider') {
+    categoryInput.disabled = false;
+    getTypeOptions(selectedType).forEach((category) => {
+      const option = document.createElement('option');
+      option.value = category;
+      option.textContent = category;
+      categoryInput.appendChild(option);
+    });
 
-  const currentCategory = categoryInput.dataset.selected || getTypeOptions(selectedType)[0];
-  categoryInput.value = getTypeOptions(selectedType).includes(currentCategory) ? currentCategory : getTypeOptions(selectedType)[0];
-  categoryInput.dataset.selected = categoryInput.value;
+    const currentCategory = categoryInput.dataset.selected || getTypeOptions(selectedType)[0];
+    categoryInput.value = getTypeOptions(selectedType).includes(currentCategory) ? currentCategory : getTypeOptions(selectedType)[0];
+    categoryInput.dataset.selected = categoryInput.value;
+  } else {
+    // Tür seçilmeden kategori seçilemez.
+    categoryInput.disabled = true;
+    categoryInput.innerHTML = '<option value="">Önce tür seçin</option>';
+    categoryInput.dataset.selected = '';
+  }
 
   const categoryOptions = ['all', ...new Set(getAllRecords().map((item) => item.category))];
   const currentFilter = filterCategory.value;
@@ -1331,8 +1354,18 @@ function renderSummary() {
   monthLabelEl.textContent = currentMonth;
 }
 
+function getAttachmentCounts() {
+  const counts = new Map();
+  if (!state.db) return counts;
+
+  const result = state.db.exec('SELECT transaction_id, COUNT(*) FROM attachments GROUP BY transaction_id');
+  result[0]?.values.forEach(([transactionId, count]) => counts.set(transactionId, Number(count)));
+  return counts;
+}
+
 function renderTable() {
   const filtered = getFilteredRecords();
+  const attachmentCounts = getAttachmentCounts();
 
   if (!filtered.length) {
     tableBody.innerHTML = `
@@ -1354,7 +1387,12 @@ function renderTable() {
         <td>${escapeHtml(record.name_company || '')}</td>
         <td>${escapeHtml(record.description || 'Açıklama yok')}</td>
         <td class="amount-col"><span class="amount ${record.type}">${record.type === 'gelir' ? '+' : '-'}${formatCurrency(Number(record.amount))}</span></td>
-        <td><button class="delete-btn" ${record.source === 'personal' ? `data-extra-id="${escapeHtml(record.id)}"` : `data-id="${escapeHtml(record.id)}"`} type="button">Sil</button></td>
+        <td class="row-actions">
+          ${record.source === 'personal'
+    ? `<button class="edit-btn" data-edit-extra-id="${escapeHtml(record.id)}" type="button">Düzenle</button>`
+    : `<button class="edit-btn" data-attach-id="${escapeHtml(record.id)}" type="button" title="Belgeler / fotoğraflar">📎${attachmentCounts.get(record.id) ? ` ${attachmentCounts.get(record.id)}` : ''}</button><button class="edit-btn" data-edit-id="${escapeHtml(record.id)}" type="button">Düzenle</button>`}
+          <button class="delete-btn" ${record.source === 'personal' ? `data-extra-id="${escapeHtml(record.id)}"` : `data-id="${escapeHtml(record.id)}"`} type="button">Sil</button>
+        </td>
       </tr>
     `)
     .join('');
@@ -1391,15 +1429,27 @@ function renderMonthlyChart() {
     .join('');
 }
 
-function updateFormType(event) {
-  const selectedType = event.target.value;
-  const currentCategories = getTypeOptions(selectedType);
-  categoryInput.dataset.selected = currentCategories[0];
+const typeToggleButtons = document.querySelectorAll('[data-form-type]');
+
+// Tür düğmelerinin görünümünü günceller; type: 'gelir' | 'gider' | '' (seçim yok)
+function setFormType(type) {
+  typeInput.value = type;
+  typeToggleButtons.forEach((button) => {
+    const active = button.dataset.formType === type;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', String(active));
+  });
+
+  categoryInput.dataset.selected = type ? getTypeOptions(type)[0] : '';
   renderCategoryOptions();
 }
 
 async function addCategory() {
   ensureDbReady();
+  if (!typeInput.value) {
+    window.alert('Kategori eklemek için önce işlem türünü (Gelir veya Gider) seçin.');
+    return;
+  }
   const categoryName = window.prompt(`Yeni ${typeInput.value === 'gelir' ? 'gelir' : 'gider'} kategorisinin adını girin:`)?.trim();
   if (!categoryName) return;
 
@@ -1419,6 +1469,10 @@ async function addCategory() {
 
 async function removeCategory() {
   ensureDbReady();
+  if (!typeInput.value || !categoryInput.value) {
+    window.alert('Kategori çıkarmak için önce işlem türünü (Gelir veya Gider) seçin.');
+    return;
+  }
   const categoryName = categoryInput.value;
   const currentCategories = getTypeOptions(typeInput.value);
   if (currentCategories.length <= 1) {
@@ -1653,6 +1707,13 @@ async function handleSubmit(event) {
   ensureDbReady();
   const amount = roundMoney(amountInput.value);
 
+  if (typeInput.value !== 'gelir' && typeInput.value !== 'gider') {
+    window.alert('Lütfen işlem türünü seçin: Gelir veya Gider.');
+    document.querySelector('.type-toggle')?.classList.add('needs-choice');
+    window.setTimeout(() => document.querySelector('.type-toggle')?.classList.remove('needs-choice'), 1500);
+    return;
+  }
+
   if (!dateInput.value || !amount || amount <= 0) {
     window.alert('Lütfen geçerli bir tarih ve tutar girin.');
     return;
@@ -1676,11 +1737,19 @@ async function handleSubmit(event) {
   await saveDbToIndexedDb();
   state.records = getRecordsFromDatabase();
 
+  const attachmentFiles = Array.from(attachmentInput.files || []);
+  if (attachmentFiles.length && typeof addAttachments === 'function') {
+    try {
+      await addAttachments(record.id, attachmentFiles);
+    } catch (error) {
+      window.alert(`İşlem kaydedildi ancak belge eklenemedi: ${error.message}`);
+    }
+  }
+
   form.reset();
   dateInput.value = getTodayISO();
-  typeInput.value = 'gelir';
+  setFormType('');
   nameCompanyInput.value = '';
-  renderCategoryOptions();
   renderAll();
 }
 
@@ -1689,6 +1758,7 @@ async function deleteRecord(id) {
 
   ensureDbReady();
   state.db.run('DELETE FROM transactions WHERE id = ?', [id]);
+  state.db.run('DELETE FROM attachments WHERE transaction_id = ?', [id]);
   // Bu işlem bir vadeli/vergi ödemesinden oluştuysa ödeme tekrar "bekliyor" durumuna döner.
   state.db.run("UPDATE deferred_payments SET status = 'pending', transaction_id = NULL WHERE transaction_id = ?", [id]);
   state.db.run("UPDATE tax_payments SET status = 'pending', transaction_id = NULL WHERE transaction_id = ?", [id]);
@@ -1714,6 +1784,7 @@ async function resetData() {
   state.db.run('DELETE FROM personal_people');
   state.db.run('DELETE FROM deferred_payments');
   state.db.run('DELETE FROM tax_payments');
+  state.db.run('DELETE FROM attachments');
   await saveDbToIndexedDb();
   state.records = getRecordsFromDatabase();
   state.extraPeople = getExtraPeopleFromDatabase();
@@ -1741,6 +1812,7 @@ function renderAll() {
   renderDashboardDueSummary();
   renderCompanySuggestions();
   if (!monthlySection.hidden && typeof renderMonthlySummary === 'function') renderMonthlySummary();
+  if (!accountsSection.hidden && typeof renderAccounts === 'function') renderAccounts();
 }
 
 async function apiRequest(path, options = {}) {
@@ -1829,6 +1901,7 @@ function renderSettingsStatus(settings, extraMessage = '') {
     lines.push(`Sonraki otomatik yedek: ${formatDateTime(new Date(new Date(settings.lastBackupAt).getTime() + AUTO_BACKUP_INTERVAL_MS).toISOString())} sonrası`);
   }
   lines.push(`Yedek klasörü: ${settings.backupDir || '-'}`);
+  if (typeof attachmentStatusLine === 'function') lines.push(attachmentStatusLine());
   if (extraMessage) lines.unshift(extraMessage);
   settingsStatusEl.textContent = lines.join('\n');
 }
@@ -1850,6 +1923,7 @@ function renderLocalSettingsStatus(extraMessage = '') {
   const lines = [`Son yedek: ${formatDateTime(last)}`];
   if (last) lines.push(`Sonraki otomatik yedek: ${formatDateTime(new Date(new Date(last).getTime() + AUTO_BACKUP_INTERVAL_MS).toISOString())} sonrası`);
   lines.push('Yedek dosyaları: İndirilenler klasörü (l-uva-cave-yedek-...sqlite)');
+  if (typeof attachmentStatusLine === 'function') lines.push(attachmentStatusLine());
   if (extraMessage) lines.unshift(extraMessage);
   settingsStatusEl.textContent = lines.join('\n');
 }
@@ -2038,7 +2112,7 @@ async function initializeApp() {
     await detectServerMode();
     applyBackupMode();
     dateInput.value = getTodayISO();
-    typeInput.value = 'gelir';
+    setFormType('');
     extraDateInput.value = getTodayISO();
     deferredDateInput.value = getTodayISO();
     taxDueDateInput.value = getTodayISO();
@@ -2059,7 +2133,9 @@ async function initializeApp() {
 }
 
 form.addEventListener('submit', handleSubmit);
-typeInput.addEventListener('change', updateFormType);
+typeToggleButtons.forEach((button) => {
+  button.addEventListener('click', () => setFormType(button.dataset.formType));
+});
 addCategoryBtn.addEventListener('click', addCategory);
 removeCategoryBtn.addEventListener('click', removeCategory);
 filterType.addEventListener('change', renderAll);
@@ -2080,7 +2156,11 @@ csvExportBtn.addEventListener('click', exportCsv);
 excelExportBtn.addEventListener('click', exportExcel);
 pdfExportBtn.addEventListener('click', exportPdf);
 dbExportBtn.addEventListener('click', downloadDatabase);
-dbImportBtn.addEventListener('click', () => dbImportInput.click());
+dbImportBtn.addEventListener('click', async () => {
+  if (await askPin('Yedek yüklemek mevcut tüm verilerin yerine geçer. Devam etmek için 4 haneli PIN girin.', RESTORE_PIN)) {
+    dbImportInput.click();
+  }
+});
 dbImportInput.addEventListener('change', () => restoreDatabase(dbImportInput.files[0]));
 resetBtn.addEventListener('click', resetData);
 addPersonBtn.addEventListener('click', addPerson);
@@ -2095,6 +2175,8 @@ deferredTableBody.addEventListener('click', (event) => {
   if (!(target instanceof HTMLElement)) return;
   if (target.dataset.paidId) {
     markDeferredPaymentPaid(target.dataset.paidId);
+  } else if (target.dataset.editDueId) {
+    editDeferredPayment(target.dataset.editDueId);
   } else if (target.dataset.undoId) {
     undoDeferredPayment(target.dataset.undoId);
   } else if (target.dataset.dueId) {
@@ -2106,6 +2188,8 @@ taxTableBody.addEventListener('click', (event) => {
   if (!(target instanceof HTMLElement)) return;
   if (target.dataset.taxPaidId) {
     markTaxPaymentPaid(target.dataset.taxPaidId);
+  } else if (target.dataset.editTaxId) {
+    editTaxPayment(target.dataset.editTaxId);
   } else if (target.dataset.taxUndoId) {
     undoTaxPayment(target.dataset.taxUndoId);
   } else if (target.dataset.taxId) {
@@ -2137,10 +2221,17 @@ extraExpenseList.addEventListener('click', (event) => {
 });
 tableBody.addEventListener('click', (event) => {
   const target = event.target;
-  if (target instanceof HTMLElement && target.dataset.id) {
+  if (!(target instanceof HTMLElement)) return;
+  if (target.dataset.id) {
     deleteRecord(target.dataset.id);
-  } else if (target instanceof HTMLElement && target.dataset.extraId) {
+  } else if (target.dataset.extraId) {
     deleteExtraExpense(target.dataset.extraId);
+  } else if (target.dataset.editId) {
+    editTransaction(target.dataset.editId);
+  } else if (target.dataset.editExtraId) {
+    editPersonalEntry(target.dataset.editExtraId);
+  } else if (target.dataset.attachId) {
+    openAttachments(target.dataset.attachId);
   }
 });
 

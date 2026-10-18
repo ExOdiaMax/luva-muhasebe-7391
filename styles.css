@@ -1166,3 +1166,212 @@ tr:hover td {
   color: var(--expense);
   font-size: 0.9rem;
 }
+
+/* Düzenleme, belge ve cari hesap ekranları */
+.row-actions {
+  white-space: nowrap;
+}
+
+.row-actions button + button {
+  margin-left: 6px;
+}
+
+.edit-btn {
+  background: rgba(96, 165, 250, 0.12);
+  color: #bfdbfe;
+  border: 1px solid rgba(96, 165, 250, 0.25);
+  border-radius: 10px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.edit-dialog {
+  width: min(520px, 100%);
+}
+
+.edit-fields {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 6px;
+}
+
+.attach-dialog {
+  width: min(720px, 100%);
+}
+
+.attach-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.attach-item {
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(15, 23, 42, 0.8);
+}
+
+.attach-item img {
+  display: block;
+  width: 100%;
+  height: 130px;
+  object-fit: cover;
+}
+
+.attach-item figcaption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.account-row {
+  cursor: pointer;
+}
+
+.account-detail h4 {
+  margin: 22px 0 10px;
+}
+
+@media (max-width: 900px) {
+  .row-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  table:has(> #accountsTableBody),
+  table:has(> #accountDetailBody),
+  table:has(> #accountDueBody) {
+    min-width: 0;
+  }
+
+  table:has(> #accountsTableBody) thead,
+  table:has(> #accountDetailBody) thead,
+  table:has(> #accountDueBody) thead {
+    display: none;
+  }
+
+  #accountsTableBody,
+  #accountDetailBody,
+  #accountDueBody,
+  #accountsTableBody tr,
+  #accountDetailBody tr,
+  #accountDueBody tr {
+    display: block;
+  }
+
+  #accountsTableBody tr,
+  #accountDetailBody tr,
+  #accountDueBody tr {
+    margin-bottom: 12px;
+    padding: 4px 14px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: rgba(15, 23, 42, 0.6);
+  }
+
+  #accountsTableBody td,
+  #accountDetailBody td,
+  #accountDueBody td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 0;
+    border-bottom: 1px dashed var(--border);
+    text-align: right;
+  }
+
+  #accountsTableBody td:last-child,
+  #accountDetailBody td:last-child,
+  #accountDueBody td:last-child {
+    border-bottom: 0;
+  }
+
+  #accountsTableBody td:not(.empty-state)::before,
+  #accountDetailBody td:not(.empty-state)::before,
+  #accountDueBody td:not(.empty-state)::before {
+    flex: 0 0 auto;
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    text-align: left;
+  }
+
+  #accountsTableBody td:nth-child(1)::before { content: "İsim / Firma"; }
+  #accountsTableBody td:nth-child(2)::before { content: "Gelir"; }
+  #accountsTableBody td:nth-child(3)::before { content: "Gider"; }
+  #accountsTableBody td:nth-child(4)::before { content: "Net"; }
+  #accountsTableBody td:nth-child(5)::before { content: "Bekleyen borç"; }
+  #accountsTableBody td:nth-child(6)::before { content: "İşlem"; }
+  #accountsTableBody td:nth-child(7)::before { content: "Son işlem"; }
+
+  #accountDetailBody td:nth-child(1)::before { content: "Tarih"; }
+  #accountDetailBody td:nth-child(2)::before { content: "Tür"; }
+  #accountDetailBody td:nth-child(3)::before { content: "Kategori"; }
+  #accountDetailBody td:nth-child(4)::before { content: "Açıklama"; }
+  #accountDetailBody td:nth-child(5)::before { content: "Tutar"; }
+
+  #accountDueBody td:nth-child(1)::before { content: "Vade"; }
+  #accountDueBody td:nth-child(2)::before { content: "Açıklama"; }
+  #accountDueBody td:nth-child(3)::before { content: "Yöntem"; }
+  #accountDueBody td:nth-child(4)::before { content: "Tutar"; }
+}
+
+/* Tür seçimi (Gelir / Gider düğmeleri) */
+.type-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.type-field-label {
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+}
+
+.type-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  border-radius: 14px;
+  transition: box-shadow 0.2s ease;
+}
+
+.type-toggle.needs-choice {
+  box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.7);
+}
+
+.type-toggle-btn {
+  min-height: 46px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.8);
+  color: var(--text);
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.type-toggle-btn.income.active {
+  background: rgba(34, 197, 94, 0.2);
+  border-color: rgba(34, 197, 94, 0.6);
+  color: var(--income);
+}
+
+.type-toggle-btn.expense.active {
+  background: rgba(248, 113, 113, 0.2);
+  border-color: rgba(248, 113, 113, 0.6);
+  color: var(--expense);
+}
