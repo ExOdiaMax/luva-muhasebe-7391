@@ -170,6 +170,15 @@
               </div>
 
               <label>
+                <span>Ödeme</span>
+                <select id="paymentMethodInput" required>
+                  <option value="Nakit">Nakit</option>
+                  <option value="Havale">Havale</option>
+                  <option value="Kart">Kart</option>
+                </select>
+              </label>
+
+              <label>
                 <span>İsim / Firma</span>
                 <input type="text" id="nameCompanyInput" list="companySuggestions" maxlength="100" placeholder="Örn. Tedarikçi veya kişi adı" />
               </label>

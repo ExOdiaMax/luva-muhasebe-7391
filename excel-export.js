@@ -73,8 +73,8 @@ async function exportXlsxReport() {
     data.properties.tabColor = { argb: 'FF1E5B91' };
 
     // ----- Kayıtlar sayfası
-    const headers = ['Tarih', 'Tür', 'Kategori', 'İsim / Firma', 'Açıklama', 'Tutar', 'Kaynak'];
-    data.columns = [{ width: 13 }, { width: 10 }, { width: 24 }, { width: 28 }, { width: 46 }, { width: 16 }, { width: 11 }];
+    const headers = ['Tarih', 'Tür', 'Kategori', 'İsim / Firma', 'Açıklama', 'Tutar', 'Kaynak', 'Ödeme'];
+    data.columns = [{ width: 13 }, { width: 10 }, { width: 24 }, { width: 28 }, { width: 46 }, { width: 16 }, { width: 11 }, { width: 12 }];
     headers.forEach((header, index) => {
       const cell = data.getCell(1, index + 1);
       cell.value = header;
@@ -96,6 +96,7 @@ async function exportXlsxReport() {
         record.description || '',
         roundMoney(record.amount),
         record.source === 'personal' ? 'Kişisel' : 'Şirket',
+        record.payment_method || '',
       ];
       row.getCell(1).numFmt = 'dd.mm.yyyy';
       row.getCell(1).alignment = { horizontal: 'center' };

@@ -135,6 +135,7 @@ function editTransaction(id) {
       { key: 'type', label: 'Tür', type: 'select', value: record.type, options: [{ value: 'gelir', label: 'Gelir' }, { value: 'gider', label: 'Gider' }] },
       { key: 'category', label: 'Kategori', type: 'text', value: record.category, maxLength: 60, list: categories },
       { key: 'name_company', label: 'İsim / Firma', type: 'text', value: record.name_company, maxLength: 100 },
+      { key: 'payment_method', label: 'Ödeme', type: 'select', value: record.payment_method || '', options: [{ value: '', label: '—' }, ...['Nakit', 'Havale', 'Kart'].map((item) => ({ value: item, label: item }))] },
       { key: 'description', label: 'Açıklama', type: 'text', value: record.description === 'Açıklama yok' ? '' : record.description, maxLength: 150 },
       { key: 'amount', label: 'Tutar', type: 'number', value: record.amount, required: true },
     ],
@@ -142,8 +143,8 @@ function editTransaction(id) {
       const amount = requireAmount(values.amount);
       const category = resolveCategory(values.type, values.category || 'Diğer', {});
       state.db.run(
-        'UPDATE transactions SET date = ?, type = ?, category = ?, name_company = ?, description = ?, amount = ? WHERE id = ?',
-        [values.date, values.type, category, values.name_company, values.description || 'Açıklama yok', amount, id]
+        'UPDATE transactions SET date = ?, type = ?, category = ?, name_company = ?, payment_method = ?, description = ?, amount = ? WHERE id = ?',
+        [values.date, values.type, category, values.name_company, values.payment_method, values.description || 'Açıklama yok', amount, id]
       );
       await commitEdit();
     },

@@ -42,6 +42,7 @@ const removeCategoryBtn = document.getElementById('removeCategoryBtn');
 const amountInput = document.getElementById('amountInput');
 const descriptionInput = document.getElementById('descriptionInput');
 const nameCompanyInput = document.getElementById('nameCompanyInput');
+const paymentMethodInput = document.getElementById('paymentMethodInput');
 const tableBody = document.getElementById('recordTableBody');
 const totalIncomeEl = document.getElementById('totalIncome');
 const totalExpenseEl = document.getElementById('totalExpense');
@@ -320,7 +321,7 @@ function getRecordsFromDatabase() {
   if (!state.db) return [];
 
   const result = state.db.exec(`
-    SELECT id, date, type, category, amount, description, name_company
+    SELECT id, date, type, category, amount, description, name_company, payment_method
     FROM transactions
     ORDER BY date DESC, created_at DESC
   `);
@@ -335,6 +336,7 @@ function getRecordsFromDatabase() {
     amount: Number(row[4]),
     description: row[5],
     name_company: row[6] || '',
+    payment_method: row[7] || '',
   }));
 }
 
@@ -929,6 +931,7 @@ function getAllRecords() {
     amount: entry.amount,
     description: `${entry.person_name} • ${entry.payment_method} • ${entry.description || 'Açıklama yok'}`,
     name_company: entry.person_name,
+    payment_method: entry.payment_method,
     source: 'personal',
   }));
 
@@ -1227,6 +1230,7 @@ function ensureSchema(db) {
 
   ensureCategoryOptionsTable(db);
   addColumnIfMissing(db, 'transactions', 'name_company', 'TEXT');
+  addColumnIfMissing(db, 'transactions', 'payment_method', 'TEXT');
   addColumnIfMissing(db, 'deferred_payments', 'transaction_id', 'TEXT');
   addColumnIfMissing(db, 'tax_payments', 'transaction_id', 'TEXT');
   cleanupLegacyDemoRecords(db);
@@ -1385,7 +1389,7 @@ function renderTable() {
         <td><span class="type-badge ${record.type}">${record.type === 'gelir' ? 'Gelir' : 'Gider'}</span></td>
         <td>${escapeHtml(record.category)}</td>
         <td>${escapeHtml(record.name_company || '')}</td>
-        <td>${escapeHtml(record.description || 'Açıklama yok')}</td>
+        <td>${record.source !== 'personal' && record.payment_method ? `${escapeHtml(record.payment_method)} • ` : ''}${escapeHtml(record.description || 'Açıklama yok')}</td>
         <td class="amount-col"><span class="amount ${record.type}">${record.type === 'gelir' ? '+' : '-'}${formatCurrency(Number(record.amount))}</span></td>
         <td class="row-actions">
           ${record.source === 'personal'
@@ -1490,7 +1494,7 @@ async function removeCategory() {
   renderAll();
 }
 
-const EXPORT_HEADERS = ['Tarih', 'Tür', 'Kategori', 'İsim / Firma', 'Açıklama', 'Tutar'];
+const EXPORT_HEADERS = ['Tarih', 'Tür', 'Kategori', 'İsim / Firma', 'Açıklama', 'Ödeme', 'Tutar'];
 
 function downloadBlob(blob, fileName) {
   const url = URL.createObjectURL(blob);
@@ -1512,6 +1516,7 @@ function getExportTextCells(record) {
     neutralizeFormula(record.category),
     neutralizeFormula(record.name_company || ''),
     neutralizeFormula(record.description || ''),
+    record.payment_method || '',
   ];
 }
 
@@ -1587,20 +1592,21 @@ async function exportPdf() {
   doc.text(`Tarih aralığı: ${dateRange}    Oluşturulma: ${new Date().toLocaleDateString('tr-TR')}`, 36, 52);
 
   doc.autoTable({
-    head: [['Tarih', 'Tür', 'Kategori', 'İsim / Firma', 'Açıklama', 'Tutar']],
+    head: [['Tarih', 'Tür', 'Kategori', 'İsim / Firma', 'Açıklama', 'Ödeme', 'Tutar']],
     body: records.map((record) => [
       formatDateTr(record.date),
       record.type === 'gelir' ? 'Gelir' : 'Gider',
       record.category,
       record.name_company || '',
       record.description || 'Açıklama yok',
+      record.payment_method || '',
       formatCurrency(Number(record.amount)),
     ]),
     startY: 66,
     margin: { left: 36, right: 36 },
     styles: { font: 'NotoSans', fontSize: 8, cellPadding: 4, overflow: 'linebreak' },
     headStyles: { font: 'NotoSans', fontStyle: 'bold', fillColor: [36, 91, 71] },
-    columnStyles: { 5: { halign: 'right' } },
+    columnStyles: { 6: { halign: 'right' } },
   });
 
   doc.autoTable({
@@ -1727,11 +1733,12 @@ async function handleSubmit(event) {
     amount,
     description: descriptionInput.value.trim() || 'Açıklama yok',
     name_company: nameCompanyInput.value.trim(),
+    payment_method: paymentMethodInput.value,
   };
 
   state.db.run(
-    'INSERT INTO transactions (id, date, type, category, amount, description, name_company) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [record.id, record.date, record.type, record.category, record.amount, record.description, record.name_company]
+    'INSERT INTO transactions (id, date, type, category, amount, description, name_company, payment_method) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [record.id, record.date, record.type, record.category, record.amount, record.description, record.name_company, record.payment_method]
   );
 
   await saveDbToIndexedDb();
@@ -1750,6 +1757,7 @@ async function handleSubmit(event) {
   dateInput.value = getTodayISO();
   setFormType('');
   nameCompanyInput.value = '';
+  paymentMethodInput.value = 'Nakit';
   renderAll();
 }
 
