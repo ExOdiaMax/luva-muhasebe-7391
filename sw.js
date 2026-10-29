@@ -1,5 +1,5 @@
 // Çevrimdışı çalışma: uygulama dosyaları önbelleğe alınır; internet varsa her zaman güncel sürüm alınır.
-const CACHE_NAME = 'luva-cave-20261027-204955';
+const CACHE_NAME = 'luva-cave-20261029-174457';
 const ASSETS = [
   './',
   'index.html',

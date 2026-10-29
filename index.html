@@ -82,7 +82,7 @@
       <main class="main-panel">
         <header class="topbar">
           <div>
-            <p class="eyebrow">PANEL</p>
+            <p class="eyebrow" id="topbarDate">PANEL</p>
             <h2>L'UVA CAVE Gelir-Gider Takip</h2>
           </div>
           <div class="top-actions">
@@ -169,14 +169,15 @@
                 </label>
               </div>
 
-              <label>
-                <span>Ödeme</span>
-                <select id="paymentMethodInput" required>
-                  <option value="Nakit">Nakit</option>
-                  <option value="Havale">Havale</option>
-                  <option value="Kart">Kart</option>
-                </select>
-              </label>
+              <div class="type-field pay-field">
+                <span class="type-field-label">Ödeme yöntemi</span>
+                <input type="hidden" id="paymentMethodInput" value="Nakit" />
+                <div class="pay-toggle" role="group" aria-label="Ödeme yöntemi">
+                  <button class="pay-btn active" data-payment-method="Nakit" type="button" aria-pressed="true"><span aria-hidden="true">💵</span>Nakit</button>
+                  <button class="pay-btn" data-payment-method="Havale" type="button" aria-pressed="false"><span aria-hidden="true">🏦</span>Havale</button>
+                  <button class="pay-btn" data-payment-method="Kart" type="button" aria-pressed="false"><span aria-hidden="true">💳</span>Kart</button>
+                </div>
+              </div>
 
               <label>
                 <span>İsim / Firma</span>
@@ -198,10 +199,31 @@
           </div>
 
           <div class="panel chart-panel">
-            <div class="section-heading">
+            <div class="section-heading heading-row">
               <h3>Son 6 Ay</h3>
+              <div class="chart-legend" aria-hidden="true">
+                <span><i class="dot income"></i>Gelir</span>
+                <span><i class="dot expense"></i>Gider</span>
+              </div>
             </div>
             <div id="monthlyChart" class="monthly-chart" aria-label="Aylık gelir gider grafiği"></div>
+          </div>
+        </section>
+
+        <section class="insights-grid" id="insightsSection">
+          <div class="panel">
+            <div class="section-heading heading-row">
+              <h3>Geçen Aya Göre</h3>
+              <small id="compareMonthLabel"></small>
+            </div>
+            <div id="monthCompare" class="month-compare"></div>
+          </div>
+          <div class="panel">
+            <div class="section-heading heading-row">
+              <h3>Ödeme Yöntemleri</h3>
+              <small>Bu ay</small>
+            </div>
+            <div id="paymentBreakdown" class="payment-breakdown"></div>
           </div>
         </section>
 

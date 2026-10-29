@@ -43,6 +43,12 @@ const amountInput = document.getElementById('amountInput');
 const descriptionInput = document.getElementById('descriptionInput');
 const nameCompanyInput = document.getElementById('nameCompanyInput');
 const paymentMethodInput = document.getElementById('paymentMethodInput');
+const paymentMethodButtons = document.querySelectorAll('[data-payment-method]');
+const insightsSection = document.getElementById('insightsSection');
+const monthCompareEl = document.getElementById('monthCompare');
+const compareMonthLabelEl = document.getElementById('compareMonthLabel');
+const paymentBreakdownEl = document.getElementById('paymentBreakdown');
+const topbarDateEl = document.getElementById('topbarDate');
 const tableBody = document.getElementById('recordTableBody');
 const totalIncomeEl = document.getElementById('totalIncome');
 const totalExpenseEl = document.getElementById('totalExpense');
@@ -942,6 +948,7 @@ function showView(view) {
   navItems.forEach((item) => item.classList.toggle('active', item.dataset.view === view));
   overviewSection.hidden = view !== 'overview';
   dueSummarySection.hidden = view !== 'overview';
+  insightsSection.hidden = view !== 'overview';
   extraSection.hidden = view !== 'extra';
   deferredSection.hidden = view !== 'deferred';
   taxSection.hidden = view !== 'tax';
@@ -1356,6 +1363,10 @@ function renderSummary() {
 
   monthSnapshotEl.textContent = formatCurrency(monthTotal);
   monthLabelEl.textContent = currentMonth;
+  if (topbarDateEl) {
+    const todayText = new Date().toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    topbarDateEl.textContent = todayText.toLocaleUpperCase('tr-TR');
+  }
 }
 
 function getAttachmentCounts() {
@@ -1413,6 +1424,7 @@ function renderMonthlyChart() {
     const monthRecords = records.filter((item) => item.date.startsWith(key));
     months.push({
       label: monthDate.toLocaleDateString('tr-TR', { month: 'short' }),
+      current: i === 0,
       income: sumAmounts(monthRecords.filter((item) => item.type === 'gelir')),
       expense: sumAmounts(monthRecords.filter((item) => item.type === 'gider')),
     });
@@ -1420,20 +1432,110 @@ function renderMonthlyChart() {
 
   const maxAmount = Math.max(1, ...months.map(({ income, expense }) => Math.max(income, expense)));
 
+  const compact = new Intl.NumberFormat('tr-TR', { notation: 'compact', maximumFractionDigits: 1 });
   monthlyChart.innerHTML = months
-    .map(({ label, income, expense }) => `
-        <div class="bar-group">
+    .map(({ label, current, income, expense }) => {
+      const net = roundMoney(income - expense);
+      const netText = net === 0 ? '–' : `${net > 0 ? '+' : '−'}${compact.format(Math.abs(net))}`;
+      return `
+        <div class="bar-group${current ? ' current' : ''}">
           <div class="bar-stack">
-            <div class="bar income" style="height:${(income / maxAmount) * 100}%" title="Gelir: ${formatCurrency(income)}"></div>
-            <div class="bar expense" style="height:${(expense / maxAmount) * 100}%" title="Gider: ${formatCurrency(expense)}"></div>
+            <div class="bar income" style="height:${Math.max((income / maxAmount) * 100, 1.5)}%" title="Gelir: ${formatCurrency(income)}"></div>
+            <div class="bar expense" style="height:${Math.max((expense / maxAmount) * 100, 1.5)}%" title="Gider: ${formatCurrency(expense)}"></div>
           </div>
           <span class="month-label">${escapeHtml(label)}</span>
+          <span class="month-net ${net > 0 ? 'pos' : net < 0 ? 'neg' : ''}" title="Net: ${formatCurrency(net)}">${netText}</span>
         </div>
-      `)
+      `;
+    })
     .join('');
 }
 
 const typeToggleButtons = document.querySelectorAll('[data-form-type]');
+
+function setPaymentMethod(method) {
+  paymentMethodInput.value = method;
+  paymentMethodButtons.forEach((button) => {
+    const active = button.dataset.paymentMethod === method;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', String(active));
+  });
+}
+
+function formatDelta(current, previous, upIsGood) {
+  if (!previous && !current) return { text: '–', tone: 'flat' };
+  if (!previous) return { text: 'Yeni', tone: upIsGood ? 'good' : 'bad' };
+  const pct = Math.round(((current - previous) / Math.abs(previous)) * 100);
+  if (pct === 0) return { text: '%0', tone: 'flat' };
+  const good = (pct > 0) === upIsGood;
+  return { text: `${pct > 0 ? '▲' : '▼'} %${Math.abs(pct)}`, tone: good ? 'good' : 'bad' };
+}
+
+function renderInsights() {
+  if (!monthCompareEl || !paymentBreakdownEl) return;
+  const records = getAllRecords();
+  const now = new Date();
+  const monthKey = (offset) => {
+    const d = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  };
+  const thisKey = monthKey(0);
+  const lastKey = monthKey(-1);
+  const totalsFor = (key) => {
+    const items = records.filter((item) => item.date.startsWith(key));
+    const income = sumAmounts(items.filter((item) => item.type === 'gelir'));
+    const expense = sumAmounts(items.filter((item) => item.type === 'gider'));
+    return { items, income, expense, net: roundMoney(income - expense) };
+  };
+  const cur = totalsFor(thisKey);
+  const prev = totalsFor(lastKey);
+
+  compareMonthLabelEl.textContent = `${new Date(now.getFullYear(), now.getMonth() - 1, 1).toLocaleDateString('tr-TR', { month: 'long' })} → ${now.toLocaleDateString('tr-TR', { month: 'long' })}`;
+  const rows = [
+    { label: 'Gelir', tone: 'income', cur: cur.income, prev: prev.income, upIsGood: true },
+    { label: 'Gider', tone: 'expense', cur: cur.expense, prev: prev.expense, upIsGood: false },
+    { label: 'Net', tone: 'balance', cur: cur.net, prev: prev.net, upIsGood: true },
+  ];
+  monthCompareEl.innerHTML = rows.map((row) => {
+    const delta = formatDelta(row.cur, row.prev, row.upIsGood);
+    return `
+      <div class="compare-row ${row.tone}">
+        <div>
+          <span class="compare-label">${row.label}</span>
+          <strong>${formatCurrency(row.cur)}</strong>
+        </div>
+        <div class="compare-side">
+          <span class="delta ${delta.tone}">${delta.text}</span>
+          <small>Geçen ay ${formatCurrency(row.prev)}</small>
+        </div>
+      </div>`;
+  }).join('');
+
+  const methods = ['Nakit', 'Havale', 'Kart'];
+  const groups = methods.map((method) => ({ method, items: cur.items.filter((item) => item.payment_method === method) }));
+  const unspecified = cur.items.filter((item) => !methods.includes(item.payment_method));
+  if (unspecified.length) groups.push({ method: 'Belirtilmemiş', items: unspecified });
+  const icons = { Nakit: '💵', Havale: '🏦', Kart: '💳', 'Belirtilmemiş': '•' };
+  const stats = groups.map((group) => ({
+    method: group.method,
+    count: group.items.length,
+    income: sumAmounts(group.items.filter((item) => item.type === 'gelir')),
+    expense: sumAmounts(group.items.filter((item) => item.type === 'gider')),
+  }));
+  const maxValue = Math.max(1, ...stats.map((s) => Math.max(s.income, s.expense)));
+  paymentBreakdownEl.innerHTML = cur.items.length
+    ? stats.map((s) => `
+      <div class="pay-row">
+        <div class="pay-row-head">
+          <span class="pay-name"><span aria-hidden="true">${icons[s.method]}</span>${escapeHtml(s.method)}</span>
+          <small>${s.count} işlem</small>
+        </div>
+        <div class="pay-bar"><i class="income" style="width:${(s.income / maxValue) * 100}%"></i></div>
+        <div class="pay-bar"><i class="expense" style="width:${(s.expense / maxValue) * 100}%"></i></div>
+        <div class="pay-amounts"><span class="income">+${formatCurrency(s.income)}</span><span class="expense">−${formatCurrency(s.expense)}</span></div>
+      </div>`).join('')
+    : '<p class="empty-note">Bu ay henüz işlem yok.</p>';
+}
 
 // Tür düğmelerinin görünümünü günceller; type: 'gelir' | 'gider' | '' (seçim yok)
 function setFormType(type) {
@@ -1757,7 +1859,7 @@ async function handleSubmit(event) {
   dateInput.value = getTodayISO();
   setFormType('');
   nameCompanyInput.value = '';
-  paymentMethodInput.value = 'Nakit';
+  setPaymentMethod('Nakit');
   renderAll();
 }
 
@@ -1813,6 +1915,7 @@ function renderAll() {
   renderSummary();
   renderTable();
   renderMonthlyChart();
+  renderInsights();
   renderExtraPeople();
   renderExtraExpenses();
   renderDuePayments();
@@ -2143,6 +2246,9 @@ async function initializeApp() {
 form.addEventListener('submit', handleSubmit);
 typeToggleButtons.forEach((button) => {
   button.addEventListener('click', () => setFormType(button.dataset.formType));
+});
+paymentMethodButtons.forEach((button) => {
+  button.addEventListener('click', () => setPaymentMethod(button.dataset.paymentMethod));
 });
 addCategoryBtn.addEventListener('click', addCategory);
 removeCategoryBtn.addEventListener('click', removeCategory);
